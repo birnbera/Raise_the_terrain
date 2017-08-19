@@ -10,8 +10,8 @@
 void initGrid(SDL_Point (*grid)[XGRID][YGRID], size_t xgrid, size_t ygrid);
 void scaleGrid(SDL_Point (*grid)[XGRID][YGRID], size_t xgrid, size_t ygrid);
 void drawGrid(SDL_Renderer *renderer, SDL_Point (*grid)[XGRID][YGRID], size_t xgrid, size_t ygrid);
-int getIsoX(float inclination, int x, int y);
-int getIsoY(float inclination, int x, int y, int z);
+int getIsoX(float inclination, int x, int y, size_t xgrid);
+int getIsoY(float inclination, int x, int y, int z, size_t ygrid);
 
 FILE *altitudes;
 
@@ -83,9 +83,9 @@ void initGrid(SDL_Point (*grid)[XGRID][XGRID], size_t xgrid, size_t ygrid)
 	for (y = ypos = 0; y < ygrid; y++, ypos++)
 	{
 	    zpos = atoi(alt);
-	    (*grid)[x][y].x = getIsoX(0.7, xpos, ypos);
-	    (*grid)[x][y].y = getIsoY(0.7, xpos, ypos, zpos);
-	    alt = strtok(NULL, "\n\t\r ");
+	    (*grid)[x][y].x = getIsoX(0.7, xpos, ypos, xgrid);
+	    (*grid)[x][y].y = getIsoY(0.7, xpos, ypos, zpos, ygrid);
+ 	    alt = strtok(NULL, "\n\t\r ");
 	}
     }
     if (lineptr)
@@ -95,7 +95,8 @@ void initGrid(SDL_Point (*grid)[XGRID][XGRID], size_t xgrid, size_t ygrid)
 void scaleGrid(SDL_Point (*grid)[XGRID][XGRID], size_t xgrid, size_t ygrid)
 {
     int ymax, ymin, xmax, xmin;
-    int xscale, xbias, yscale, ybias;
+    int xscale, xbias, ybias, scale, bias;
+    float yscale;
     size_t x, y;
     SDL_Point point;
 
@@ -116,16 +117,15 @@ void scaleGrid(SDL_Point (*grid)[XGRID][XGRID], size_t xgrid, size_t ygrid)
 		ymax = point.y;
 	}
     }
-    xscale = (SCREEN_WIDTH - 50) / (xmax - xmin);
-    xbias = -xmin + 25;
-    yscale = (SCREEN_HEIGHT - 50) / (ymax - ymin);
-    ybias = -ymin + 25;
+    xbias = 25 - xmin;
+    ybias = 25 - ymin;
+    yscale = (SCREEN_HEIGHT - 100) / (float) (ymax - ymin);
     for (x = 0; x < xgrid; x++)
     {
 	for (y = 0; y < ygrid; y++)
 	{
-	    (*grid)[x][y].x = ((*grid)[x][y].x - xmin) * xscale + xbias;
-	    (*grid)[x][y].y = ((*grid)[x][y].y - ymin) * yscale + ybias;
+	    (*grid)[x][y].x = (*grid)[x][y].x + xbias;
+	    (*grid)[x][y].y = (int) ((*grid)[x][y].y * yscale) + ybias;
 	}
     }
 }
@@ -145,12 +145,20 @@ void drawGrid(SDL_Renderer *renderer, SDL_Point (*grid)[XGRID][YGRID], size_t xg
     SDL_RenderDrawLines(renderer, (*grid)[x], xgrid);
 }
 
-int getIsoX(float inclination, int x, int y)
+int getIsoX(float inclination, int x, int y, size_t xgrid)
 {
-    return ((int) (lroundf(inclination * x) - lroundf(inclination * y)));
+    float wx = inclination * (x - y);
+    float scalex = (SCREEN_WIDTH - 100) / (float) (xgrid + 1);
+    int isoX = (int) lrintf(wx * scalex);
+
+    return (isoX);
 }
 
-int getIsoY(float inclination, int x, int y, int z)
+int getIsoY(float inclination, int x, int y, int z, size_t ygrid)
 {
-    return ((int) (lroundf((1 - inclination) * x) + lroundf((1 - inclination) * y) - z));
+    float wy = (1 - inclination) * (x + y);
+    float scaley = (SCREEN_HEIGHT - 100) / (float) (ygrid + 1);
+    int isoY = (int) lrintf(wy * scaley - z);
+
+    return (isoY);
 }
