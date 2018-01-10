@@ -1,5 +1,6 @@
 #include "terrain.h"
 
+
 int main(int argc, char *argv[])
 {
 	FILE *altitudes;
