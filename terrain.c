@@ -1,164 +1,128 @@
-#include <SDL2/SDL.h>
-#include <math.h>
-#include <stdlib.h>
+#include "terrain.h"
 
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
-#define XGRID 8
-#define YGRID 8
-
-void initGrid(SDL_Point (*grid)[XGRID][YGRID], size_t xgrid, size_t ygrid);
-void scaleGrid(SDL_Point (*grid)[XGRID][YGRID], size_t xgrid, size_t ygrid);
-void drawGrid(SDL_Renderer *renderer, SDL_Point (*grid)[XGRID][YGRID], size_t xgrid, size_t ygrid);
-int getIsoX(float inclination, int x, int y, size_t xgrid);
-int getIsoY(float inclination, int x, int y, int z, size_t ygrid);
-
-FILE *altitudes;
 
 int main(int argc, char *argv[])
 {
-    SDL_Window *window = NULL;
-    SDL_Renderer *renderer = NULL;
-    SDL_Event e;
-    SDL_Point grid[XGRID][YGRID];
-    int quit = 0;
+	FILE *altitudes;
+	SDL_Window *win = NULL;
+	SDL_Renderer *rend = NULL;
+	SDL_Event e;
+	SDL_Point grid[GRD_SZ][GRD_SZ];
+	int quit = SDL_FALSE;
 
-    if (argc < 2)
-    {
-	printf("Usage: %s altitudes\n", argv[0]);
-	exit(EXIT_FAILURE);
-    }
-    altitudes = fopen(argv[1], "r");
-    if (SDL_Init(SDL_INIT_VIDEO))
-	printf("Could not initialize SDL: %s", SDL_GetError());
-    else
-    {
-	if (SDL_CreateWindowAndRenderer(SCREEN_WIDTH, SCREEN_HEIGHT,
-					0, &window, &renderer))
-	    printf("Could not create window and/or renderer: %s",
-		   SDL_GetError());
-	else
+	if (argc < 2)
 	{
-	    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-	    SDL_RenderClear(renderer);
-	    SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-	    initGrid(&grid, XGRID, YGRID);
-	    scaleGrid(&grid, XGRID, YGRID);
-	    drawGrid(renderer, &grid, XGRID, YGRID);
-	    SDL_RenderPresent(renderer);
-	    while(!quit)
-	    {
-		while(SDL_PollEvent(&e))
+		fprintf(stderr, "Usage: %s <altitudes>\n", argv[0]);
+		exit(EXIT_FAILURE);
+	}
+	altitudes = fopen(argv[1], "r");
+	on_exit(close_file, altitudes);
+	atexit(SDL_Quit);
+	if (SDL_Init(SDL_INIT_VIDEO))
+	{
+		fprintf(stderr, "Could not initialize SDL: %s", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+	if (SDL_CreateWindowAndRenderer(SCR_W, SCR_H, 0, &win, &rend))
+	{
+		fprintf(stderr, "Could not create window and/or renderer: %s",
+			SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+	on_exit(destroy_renderer, rend);
+	on_exit(destroy_window, win);
+	SDL_SetRenderDrawColor(rend, 0, 0, 0, SDL_ALPHA_OPAQUE);
+	SDL_RenderClear(rend);
+	SDL_SetRenderDrawColor(rend, 255, 255, 255, SDL_ALPHA_OPAQUE);
+	init_grid(grid, altitudes);
+	draw_grid(grid, rend);
+	SDL_RenderPresent(rend);
+	while (!quit)
+	{
+		while (SDL_PollEvent(&e))
 		{
-		    if (e.type == SDL_QUIT)
-			quit = SDL_TRUE;
-		    else if (e.key.keysym.sym == SDLK_ESCAPE)
-			quit = 1;
+			if (e.type == SDL_QUIT
+			    || e.key.keysym.sym == SDLK_ESCAPE)
+			{
+				quit = SDL_TRUE;
+			}
 		}
-	    }
-	    if (renderer)
-		SDL_DestroyRenderer(renderer);
-	    if (window)
-		SDL_DestroyWindow(window);
 	}
-    }
-    SDL_Quit();
-    fclose(altitudes);
-    return (0);
+	exit(EXIT_SUCCESS);
 }
 
-void initGrid(SDL_Point (*grid)[XGRID][XGRID], size_t xgrid, size_t ygrid)
+void close_file(int status, void *file)
 {
-    size_t x, y, n;
-    int xpos, ypos, zpos, xstep, ystep;
-    char *lineptr = NULL, *alt;
+	(void) status;
 
-    /*xstep = SCREEN_WIDTH / (xgrid + 1);
-      ystep = SCREEN_HEIGHT / (ygrid + 1);*/
-    for (x = xpos = 0; x < xgrid; x++, xpos++)
-    {
-	if (getline(&lineptr, &n, altitudes) < 0)
-	    break;
-	alt = strtok(lineptr, "\n\t\r ");
-	for (y = ypos = 0; y < ygrid; y++, ypos++)
-	{
-	    zpos = atoi(alt);
-	    (*grid)[x][y].x = getIsoX(0.7, xpos, ypos, xgrid);
-	    (*grid)[x][y].y = getIsoY(0.7, xpos, ypos, zpos, ygrid);
- 	    alt = strtok(NULL, "\n\t\r ");
-	}
-    }
-    if (lineptr)
-	free(lineptr);
+	fclose(file);
 }
 
-void scaleGrid(SDL_Point (*grid)[XGRID][XGRID], size_t xgrid, size_t ygrid)
+void destroy_renderer(int status, void *rend)
 {
-    int ymax, ymin, xmax, xmin;
-    int xscale, xbias, ybias, scale, bias;
-    float yscale;
-    size_t x, y;
-    SDL_Point point;
+	(void) status;
 
-    xmin = xmax = (*grid)[0][0].x;
-    ymin = ymax = (*grid)[0][0].y;
-    for (x = 0; x < xgrid; x++)
-    {
-	for (y = 0; y < ygrid; y++)
-	{
-	    point = (*grid)[x][y];
-	    if (point.x < xmin)
-		xmin = point.x;
-	    if (point.x > xmax)
-		xmax = point.x;
-	    if (point.y < ymin)
-		ymin = point.y;
-	    if (point.y > ymax)
-		ymax = point.y;
-	}
-    }
-    xbias = 25 - xmin;
-    ybias = 25 - ymin;
-    yscale = (SCREEN_HEIGHT - 100) / (float) (ymax - ymin);
-    for (x = 0; x < xgrid; x++)
-    {
-	for (y = 0; y < ygrid; y++)
-	{
-	    (*grid)[x][y].x = (*grid)[x][y].x + xbias;
-	    (*grid)[x][y].y = (int) ((*grid)[x][y].y * yscale) + ybias;
-	}
-    }
+	if (rend)
+		SDL_DestroyRenderer(rend);
 }
 
-void drawGrid(SDL_Renderer *renderer, SDL_Point (*grid)[XGRID][YGRID], size_t xgrid, size_t ygrid)
+void destroy_window(int status, void *win)
+{
+	(void) status;
+
+	if (win)
+		SDL_DestroyWindow(win);
+}
+
+void init_grid(SDL_Point (*grid)[GRD_SZ], FILE *altitudes)
+{
+	size_t i, j, n;
+	double x, y, z, xmin, xmax, ymax;
+	char *line, *saveptr, *token;
+	char *delims = "\n\t\r ";
+
+
+	xmax = 0.7 * GRD_SZ;
+	xmin = -xmax;
+	ymax = 0.3 * 2 * GRD_SZ;
+
+	line = NULL;
+	i = 0;
+	while (getline(&line, &n, altitudes) >= 0)
+	{
+		token = strtok_r(line, delims, &saveptr);
+		j = 0;
+		while (token != NULL)
+		{
+			z = atof(token);
+			x = 0.7 * (i - j);
+			y = 0.3 * (i + j) - z;
+
+			x -= xmin;
+			x *= SCR_W / (xmax - xmin);
+			y *= SCR_H / ymax;
+
+			grid[i][j].x = lround(x);
+			grid[i][j].y = lround(y);
+			token = strtok_r(NULL, delims, &saveptr);
+			y++;
+		}
+		x++;
+	}
+	free(line);
+}
+
+void draw_grid(SDL_Point (*grid)[GRD_SZ], SDL_Renderer *renderer)
 {
     size_t x, y;
 
-    for (x = 0; x < xgrid-1; x++)
+    for (x = 0; x < GRD_SZ - 1; x++)
     {
-	SDL_RenderDrawLines(renderer, (*grid)[x], xgrid);
-	for (y = 0; y < ygrid; y++)
+	SDL_RenderDrawLines(renderer, grid[x], GRD_SZ);
+	for (y = 0; y < GRD_SZ; y++)
 	    SDL_RenderDrawLine(renderer,
-			       (*grid)[x][y].x, (*grid)[x][y].y,
-			       (*grid)[x+1][y].x, (*grid)[x+1][y].y);
+			       grid[x][y].x, grid[x][y].y,
+			       grid[x+1][y].x, grid[x+1][y].y);
     }
-    SDL_RenderDrawLines(renderer, (*grid)[x], xgrid);
-}
-
-int getIsoX(float inclination, int x, int y, size_t xgrid)
-{
-    float wx = inclination * (x - y);
-    float scalex = (SCREEN_WIDTH - 100) / (float) (xgrid + 1);
-    int isoX = (int) lrintf(wx * scalex);
-
-    return (isoX);
-}
-
-int getIsoY(float inclination, int x, int y, int z, size_t ygrid)
-{
-    float wy = (1 - inclination) * (x + y);
-    float scaley = (SCREEN_HEIGHT - 100) / (float) (ygrid + 1);
-    int isoY = (int) lrintf(wy * scaley - z);
-
-    return (isoY);
+    SDL_RenderDrawLines(renderer, grid[x], GRD_SZ);
 }
