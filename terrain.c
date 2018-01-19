@@ -9,7 +9,8 @@ int main(int argc, char *argv[])
     SDL_Renderer *rend = NULL;
     SDL_Event e;
     SDL_Point grid[GRD_SZ][GRD_SZ];
-    SDL_Rect vp;
+    float3d_t coords[GRD_SZ][GRD_SZ];
+    int angle = 0;
     int quit = SDL_FALSE;
 
     if (argc < 2)
@@ -36,22 +37,12 @@ int main(int argc, char *argv[])
     SDL_SetRenderDrawColor(rend, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(rend);
     SDL_SetRenderDrawColor(rend, 255, 255, 255, SDL_ALPHA_OPAQUE);
-    init_grid(&grid, altitudes);
 
-    vp.x = vp.y = -100;
-    vp.w = 400;
-    vp.h = 400;
-    if (SDL_RenderSetViewport(rend, &vp))
-    {
-	fprintf(stderr, "Could not set viewport: %s", SDL_GetError());
-    }
-    SDL_RenderGetViewport(rend, &vp);
-    printf("x: %d\n", vp.x);
-    printf("y: %d\n", vp.y);
-    printf("w: %d\n", vp.w);
-    printf("h: %d\n", vp.h);
+    init_xycoords(coords);
+    get_zcoords(coords, altitudes);
+    project_to_grid(grid, coords, angle);
 
-    draw_grid(&grid, rend);
+    draw_grid(grid, rend);
     SDL_RenderPresent(rend);
     while (!quit)
     {
@@ -61,6 +52,18 @@ int main(int argc, char *argv[])
 		|| e.key.keysym.sym == SDLK_ESCAPE)
 	    {
 		quit = SDL_TRUE;
+	    }
+	    else if (e.key.keysym.sym == SDLK_RIGHT ||
+		     e.key.keysym.sym == SDLK_LEFT)
+	    {
+		if (e.key.keysym.sym == SDLK_RIGHT)
+		    angle = (angle == 0 ? 359 : angle - 1);
+		else
+		    angle = (angle == 359 ? 0 : angle + 1);
+		project_to_grid(grid, coords, angle);
+
+		draw_grid(grid, rend);
+		SDL_RenderPresent(rend);
 	    }
 	}
     }
@@ -90,42 +93,21 @@ void destroy_window(int status, void *win)
 	SDL_DestroyWindow(win);
 }
 
-void init_grid(SDL_Point (*grid)[GRD_SZ][GRD_SZ], FILE *altitudes)
+void get_zcoords(float3d_t coords[GRD_SZ][GRD_SZ], FILE *altitudes)
 {
-    int i, j;
-    size_t n;
-    double x, y, z, xmin, xmax, ymax;
+    size_t i, j, n;
     char *line, *saveptr, *token;
-    char *delims = "\n\t\r ";
-
-
-    xmax = 0.7 * (GRD_SZ - 1);
-    xmin = -xmax;
-    ymax = 0.3 * 2 * (GRD_SZ - 1);
+    char *delims = "\n\r\t ";
 
     line = NULL;
     i = 0;
-    while (getline(&line, &n, altitudes) >= 0)
+    while (i < GRD_SZ && getline(&line, &n, altitudes) >=0)
     {
-	token = strtok_r(line, delims, &saveptr);
 	j = 0;
-	while (token != NULL)
+	token = strtok_r(line, delims, &saveptr);
+	while (j < GRD_SZ && token != NULL)
 	{
-	    z = atof(token);
-	    x = 0.7 * (i - j);
-	    y = 0.3 * (i + j);
-
-	    x -= xmin;
-	    x *= 0.8 * SCR_W / (xmax - xmin);
-	    x += 0.1 * SCR_W;
-
-	    y *= 0.5 * SCR_H / ymax;
-	    y += 0.25 * SCR_H;
-	    y -= 0.5 * z;
-
-	    (*grid)[i][j].x = lround(x);
-	    (*grid)[i][j].y = lround(y);
-	    token = strtok_r(NULL, delims, &saveptr);
+	    coords[i][j].z = atof(token) * ZSCALE;
 	    j++;
 	}
 	i++;
@@ -133,17 +115,73 @@ void init_grid(SDL_Point (*grid)[GRD_SZ][GRD_SZ], FILE *altitudes)
     free(line);
 }
 
-void draw_grid(SDL_Point (*grid)[GRD_SZ][GRD_SZ], SDL_Renderer *renderer)
+void init_xycoords(float3d_t coords[GRD_SZ][GRD_SZ])
 {
-    size_t x, y;
+    size_t i, j;
+    float x, y;
 
-    for (x = 0; x < GRD_SZ - 1; x++)
+    for (i = 0, x = GRD_SZ / -2.0; i < GRD_SZ; i++, x++)
     {
-	SDL_RenderDrawLines(renderer, (*grid)[x], GRD_SZ);
-	for (y = 0; y < GRD_SZ; y++)
-	    SDL_RenderDrawLine(renderer,
-			       (*grid)[x][y].x, (*grid)[x][y].y,
-			       (*grid)[x+1][y].x, (*grid)[x+1][y].y);
+	for (j = 0, y = GRD_SZ / -2.0; j < GRD_SZ; j++, y++)
+	{
+	    coords[i][j].x = x;
+	    coords[i][j].y = y;
+	}
     }
-    SDL_RenderDrawLines(renderer, (*grid)[x], GRD_SZ);
+}
+
+void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
+		     float3d_t coords[GRD_SZ][GRD_SZ],
+		     int angle)
+{
+    size_t i, j;
+    double a;
+    float wx, wy, Rx, Ry, xmin, xmax, ymax;
+    float3d_t *coord;
+
+    xmax = 0.7 * (GRD_SZ - 1);
+    xmin = -xmax;
+    ymax = 0.3 * 2 * (GRD_SZ - 1);
+
+    for (i = 0; i < GRD_SZ; i++)
+    {
+	for (j = 0; j < GRD_SZ; j++)
+	{
+	    coord = &coords[i][j];
+
+	    a = angle * PI / 180.0;
+	    Rx = coord->x * cos(a) - coord->y * sin(a);
+	    Ry = coord->x * sin(a) + coord->y * cos(a);
+
+	    wx = INCLINATION * (Rx - Ry);
+	    wy = (1 - INCLINATION) * (Rx + Ry);
+
+	    wx -= xmin;
+	    wx *= 0.8 * SCR_W / (xmax - xmin);
+	    wx += 0.1 * SCR_W;
+
+	    wy *= 0.5 * SCR_H / ymax;
+	    wy += 0.25 * SCR_H;
+
+	    wy -= 0.5 * coord->z;
+
+	    coord->x = wx;
+	    coord->y = wy;
+	}
+    }
+}
+
+void draw_grid(SDL_Point grid[GRD_SZ][GRD_SZ], SDL_Renderer *renderer)
+{
+    size_t i, j;
+
+    for (i = 0; i < GRD_SZ - 1; i++)
+    {
+	SDL_RenderDrawLines(renderer, grid[i], GRD_SZ);
+	for (j = 0; j < GRD_SZ; j++)
+	    SDL_RenderDrawLine(renderer,
+			       grid[i][j].x, grid[i][j].y,
+			       grid[i+1][j].x, grid[i+1][j].y);
+    }
+    SDL_RenderDrawLines(renderer, grid[i], GRD_SZ);
 }
