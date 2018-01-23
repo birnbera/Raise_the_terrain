@@ -49,7 +49,8 @@ int main(int argc, char *argv[])
 	while (SDL_PollEvent(&e))
 	{
 	    if (e.type == SDL_QUIT
-		|| e.key.keysym.sym == SDLK_ESCAPE)
+		|| e.key.keysym.sym == SDLK_ESCAPE
+		|| e.key.keysym.sym == SDLK_q)
 	    {
 		quit = SDL_TRUE;
 	    }
@@ -60,9 +61,14 @@ int main(int argc, char *argv[])
 		    angle = (angle == 0 ? 359 : angle - 1);
 		else
 		    angle = (angle == 359 ? 0 : angle + 1);
-		project_to_grid(grid, coords, angle);
 
+		SDL_SetRenderDrawColor(rend, 0, 0, 0, SDL_ALPHA_OPAQUE);
+		SDL_RenderClear(rend);
+		SDL_SetRenderDrawColor(rend, 255, 255, 255, SDL_ALPHA_OPAQUE);
+
+		project_to_grid(grid, coords, angle);
 		draw_grid(grid, rend);
+
 		SDL_RenderPresent(rend);
 	    }
 	}
@@ -109,6 +115,7 @@ void get_zcoords(float3d_t coords[GRD_SZ][GRD_SZ], FILE *altitudes)
 	{
 	    coords[i][j].z = atof(token) * ZSCALE;
 	    j++;
+	    token = strtok_r(NULL, delims, &saveptr);
 	}
 	i++;
     }
@@ -120,9 +127,9 @@ void init_xycoords(float3d_t coords[GRD_SZ][GRD_SZ])
     size_t i, j;
     float x, y;
 
-    for (i = 0, x = GRD_SZ / -2.0; i < GRD_SZ; i++, x++)
+    for (i = 0, x = GRD_SZ / -2.0 + 0.5; i < GRD_SZ; i++, x++)
     {
-	for (j = 0, y = GRD_SZ / -2.0; j < GRD_SZ; j++, y++)
+	for (j = 0, y = GRD_SZ / -2.0 + 0.5; j < GRD_SZ; j++, y++)
 	{
 	    coords[i][j].x = x;
 	    coords[i][j].y = y;
@@ -135,7 +142,7 @@ void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
 		     int angle)
 {
     size_t i, j;
-    double a;
+    float a;
     float wx, wy, Rx, Ry, xmin, xmax, ymax;
     float3d_t *coord;
 
@@ -147,7 +154,7 @@ void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
     {
 	for (j = 0; j < GRD_SZ; j++)
 	{
-	    coord = &coords[i][j];
+	    coord = &(coords[i][j]);
 
 	    a = angle * PI / 180.0;
 	    Rx = coord->x * cos(a) - coord->y * sin(a);
@@ -161,12 +168,12 @@ void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
 	    wx += 0.1 * SCR_W;
 
 	    wy *= 0.5 * SCR_H / ymax;
-	    wy += 0.25 * SCR_H;
+	    wy += 0.5 * SCR_H;
 
 	    wy -= 0.5 * coord->z;
 
-	    coord->x = wx;
-	    coord->y = wy;
+	    grid[i][j].x = wx;
+	    grid[i][j].y = wy;
 	}
     }
 }
