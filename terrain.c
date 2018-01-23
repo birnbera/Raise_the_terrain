@@ -151,7 +151,7 @@ void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
 {
     size_t i, j;
     float ha, va;
-    float wx, wy, Rx, Ry, Rz, xmin, xmax, ymax;
+    float wx, wy, Rx, Ry, Ryy, Rz, xmin, xmax, ymax;
     float3d_t *coord;
 
     xmax = 0.7 * (GRD_SZ - 1);
@@ -170,8 +170,10 @@ void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
 	    Rx = coord->x * cos(ha) - coord->y * sin(ha);
 	    Ry = coord->x * sin(ha) + coord->y * cos(ha);
 
-	    Ry = Ry * cos(va) - coord->z * sin(va);
+	    Ryy = Ry * cos(va) - coord->z * sin(va);
 	    Rz = Ry * sin(va) + coord->z * cos(va);
+
+	    Ry = Ryy;
 
 	    wx = INCLINATION * (Rx - Ry);
 	    wy = (1 - INCLINATION) * (Rx + Ry);
