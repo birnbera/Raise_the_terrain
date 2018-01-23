@@ -25,7 +25,8 @@ void get_zcoords(float3d_t coords[GRD_SZ][GRD_SZ], FILE *altitudes);
 void init_xycoords(float3d_t coords[GRD_SZ][GRD_SZ]);
 void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
 		     float3d_t coords[GRD_SZ][GRD_SZ],
-		     int angle);
+		     int hAngle,
+		     int vAngle);
 void draw_grid(SDL_Point grid[GRD_SZ][GRD_SZ], SDL_Renderer *rend);
 
 #endif /* _TERRAIN_H_ */

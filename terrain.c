@@ -10,7 +10,8 @@ int main(int argc, char *argv[])
     SDL_Event e;
     SDL_Point grid[GRD_SZ][GRD_SZ];
     float3d_t coords[GRD_SZ][GRD_SZ];
-    int angle = 0;
+    int hAngle = 0;
+    int vAngle = 0;
     int quit = SDL_FALSE;
 
     if (argc < 2)
@@ -40,7 +41,7 @@ int main(int argc, char *argv[])
 
     init_xycoords(coords);
     get_zcoords(coords, altitudes);
-    project_to_grid(grid, coords, angle);
+    project_to_grid(grid, coords, hAngle, vAngle);
 
     draw_grid(grid, rend);
     SDL_RenderPresent(rend);
@@ -54,19 +55,25 @@ int main(int argc, char *argv[])
 	    {
 		quit = SDL_TRUE;
 	    }
-	    else if (e.key.keysym.sym == SDLK_RIGHT ||
-		     e.key.keysym.sym == SDLK_LEFT)
+	    else if (e.key.keysym.sym == SDLK_RIGHT
+		     || e.key.keysym.sym == SDLK_LEFT
+		     || e.key.keysym.sym == SDLK_UP
+		     || e.key.keysym.sym == SDLK_DOWN)
 	    {
 		if (e.key.keysym.sym == SDLK_RIGHT)
-		    angle = (angle == 0 ? 359 : angle - 1);
+		    hAngle = (hAngle == 0 ? 359 : hAngle - 1);
+		else if (e.key.keysym.sym == SDLK_LEFT)
+		    hAngle = (hAngle == 359 ? 0 : hAngle + 1);
+		else if (e.key.keysym.sym == SDLK_UP)
+		    vAngle = (vAngle == 0 ? 359 : vAngle - 1);
 		else
-		    angle = (angle == 359 ? 0 : angle + 1);
+		    vAngle = (vAngle == 359 ? 0 : vAngle + 1);
 
 		SDL_SetRenderDrawColor(rend, 0, 0, 0, SDL_ALPHA_OPAQUE);
 		SDL_RenderClear(rend);
 		SDL_SetRenderDrawColor(rend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
-		project_to_grid(grid, coords, angle);
+		project_to_grid(grid, coords, hAngle, vAngle);
 		draw_grid(grid, rend);
 
 		SDL_RenderPresent(rend);
@@ -139,11 +146,12 @@ void init_xycoords(float3d_t coords[GRD_SZ][GRD_SZ])
 
 void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
 		     float3d_t coords[GRD_SZ][GRD_SZ],
-		     int angle)
+		     int hAngle,
+		     int vAngle)
 {
     size_t i, j;
-    float a;
-    float wx, wy, Rx, Ry, xmin, xmax, ymax;
+    float ha, va;
+    float wx, wy, Rx, Ry, Rz, xmin, xmax, ymax;
     float3d_t *coord;
 
     xmax = 0.7 * (GRD_SZ - 1);
@@ -156,9 +164,14 @@ void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
 	{
 	    coord = &(coords[i][j]);
 
-	    a = angle * PI / 180.0;
-	    Rx = coord->x * cos(a) - coord->y * sin(a);
-	    Ry = coord->x * sin(a) + coord->y * cos(a);
+	    ha = hAngle * PI / 180.0;
+	    va = vAngle * PI / 180.0;
+
+	    Rx = coord->x * cos(ha) - coord->y * sin(ha);
+	    Ry = coord->x * sin(ha) + coord->y * cos(ha);
+
+	    Ry = Ry * cos(va) - coord->z * sin(va);
+	    Rz = Ry * sin(va) + coord->z * cos(va);
 
 	    wx = INCLINATION * (Rx - Ry);
 	    wy = (1 - INCLINATION) * (Rx + Ry);
@@ -170,7 +183,7 @@ void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
 	    wy *= 0.5 * SCR_H / ymax;
 	    wy += 0.5 * SCR_H;
 
-	    wy -= 0.5 * coord->z;
+	    wy -= 0.5 * Rz;
 
 	    grid[i][j].x = wx;
 	    grid[i][j].y = wy;
