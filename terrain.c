@@ -1,6 +1,13 @@
 #include "terrain.h"
 
-
+/**
+ * main - entry point for program, contains main event loop: checks for key
+ * input and calls rendering routines.
+ * @argc: argument count
+ * @argv: pointer to command line arguments
+ *
+ * Return: EXIT_SUCCESS on success, EXIT_FAILURE if some error occurs
+ */
 int main(int argc, char *argv[])
 {
     size_t i, j;
@@ -18,8 +25,6 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Usage: %s <altitudes>\n", argv[0]);
 	exit(EXIT_FAILURE);
     }
-    altitudes = fopen(argv[1], "r");
-    on_exit(close_file, altitudes);
     atexit(SDL_Quit);
     if (SDL_Init(SDL_INIT_VIDEO))
     {
@@ -38,8 +43,12 @@ int main(int argc, char *argv[])
     SDL_RenderClear(rend);
     SDL_SetRenderDrawColor(rend, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
+    altitudes = fopen(argv[1], "r");
+
     init_xycoords(coords);
     get_zcoords(coords, altitudes);
+    fclose(altitudes);
+
     project_to_grid(grid, coords, angle);
 
     draw_grid(grid, rend);
@@ -76,13 +85,12 @@ int main(int argc, char *argv[])
     exit(EXIT_SUCCESS);
 }
 
-void close_file(int status, void *file)
-{
-    (void) status;
-
-    fclose(file);
-}
-
+/**
+ * destroy_renderer - function called on exiting from program to deallocate
+ * the SDL2 renderer.
+ * @status: exit status
+ * @rend: pointer to renderer
+ */
 void destroy_renderer(int status, void *rend)
 {
     (void) status;
@@ -91,6 +99,12 @@ void destroy_renderer(int status, void *rend)
 	SDL_DestroyRenderer(rend);
 }
 
+/**
+ * destroy_window - function called on exiting from program to deallocate
+ * the SDL2 window.
+ * @status: exit status
+ * @win: pointer to window
+ */
 void destroy_window(int status, void *win)
 {
     (void) status;
@@ -99,6 +113,11 @@ void destroy_window(int status, void *win)
 	SDL_DestroyWindow(win);
 }
 
+/**
+ * get_zcoords - function to read matrix of z coordinates from file
+ * @coords: 2d matrix of 3d points in which to place z coordinates
+ * @altitudes: file pointer from which to read z coordinates
+ */
 void get_zcoords(float3d_t coords[GRD_SZ][GRD_SZ], FILE *altitudes)
 {
     size_t i, j, n;
@@ -122,6 +141,12 @@ void get_zcoords(float3d_t coords[GRD_SZ][GRD_SZ], FILE *altitudes)
     free(line);
 }
 
+/**
+ * init_xycoords - initialize a 2d grid of points such that the center of
+ * the grid is origin of the x/y axes. The values are in local unit length
+ * coordinates.
+ * @coords: 2d matrix of 3d points in which to place z coordinates
+ */
 void init_xycoords(float3d_t coords[GRD_SZ][GRD_SZ])
 {
     size_t i, j;
@@ -137,6 +162,15 @@ void init_xycoords(float3d_t coords[GRD_SZ][GRD_SZ])
     }
 }
 
+/**
+ * project_to_grid - takes a matrix of points in 3d coordinates and maps them
+ * isometrically to 2d screen space and stores the result as integers using the
+ * SDL_Point struct.
+ * @grid: 2d matrix to represent points from `coords' in screen coordinates
+ * @coords: 2d matrix of 3d points to be transformed into screen coordinates
+ * @angle: angle between 0 and 359 degrees with which to rotate the points along
+ * the x/y plane.
+ */
 void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
 		     float3d_t coords[GRD_SZ][GRD_SZ],
 		     int angle)
@@ -178,6 +212,12 @@ void project_to_grid(SDL_Point grid[GRD_SZ][GRD_SZ],
     }
 }
 
+/**
+ * draw_grid - take transformed points in screen coordinates and draw lines
+ * between neighboring points to give the appearance of a mesh.
+ * @grid: 2d matrix of points to render to the screen
+ * @renderer: back buffer rendering agent
+ */
 void draw_grid(SDL_Point grid[GRD_SZ][GRD_SZ], SDL_Renderer *renderer)
 {
     size_t i, j;

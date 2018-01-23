@@ -12,13 +12,19 @@
 #include <math.h>
 #include <stdlib.h>
 
+
+/**
+ * float3d_t - struct to store a 3d point's coordinates as floats
+ * @x: x coordinate
+ * @y: y coordinate
+ * @z: z coordinate
+ */
 typedef struct {
     float x;
     float y;
     float z;
 } float3d_t;
 
-void close_file(int status, void *file);
 void destroy_renderer(int status, void *rend);
 void destroy_window(int status, void *win);
 void get_zcoords(float3d_t coords[GRD_SZ][GRD_SZ], FILE *altitudes);
