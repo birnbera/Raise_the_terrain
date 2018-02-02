@@ -93,7 +93,7 @@ void project_to_grid(SDL_Point **grid,
 {
 	size_t i, j;
 	float a;
-	float wx, wy, Rx, Ry, xmin, xmax, ymax;
+	float cx, cy, wx, wy, Rx, Ry, xmin, xmax, ymax;
 	float3d_t *coord;
 
 	xmax = INCLINATION * ncols;
@@ -104,10 +104,12 @@ void project_to_grid(SDL_Point **grid,
 	{
 		for (j = 0; j < ncols; j++)
 		{
+		    cx = (ncols - 1) / 2.0;
+		    cy = (nrows - 1) / 2.0;
 			coord = &(coords[i][j]);
 			a = angle * PI / 180.0;
-			Rx = coord->x * cos(a) - coord->y * sin(a);
-			Ry = coord->x * sin(a) + coord->y * cos(a);
+			Rx = (cx - coord->x) * cos(a) - (cy - coord->y) * sin(a) + cx;
+			Ry = (cx - coord->x) * sin(a) + (cy - coord->y) * cos(a) + cy;
 
 			wx = INCLINATION * (Rx - Ry);
 			wy = (1 - INCLINATION) * (Rx + Ry);
