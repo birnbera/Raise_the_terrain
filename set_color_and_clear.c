@@ -1,4 +1,4 @@
-#include "terrain.c"
+#include "terrain.h"
 
 /**
  * reset_and_clear - Set drawing color for renderer to black and clear buffer,

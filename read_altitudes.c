@@ -15,12 +15,12 @@
  * Return: pointer to heap-allocated 2d array of type `float3d_t` with each
  * struct's `z` member initialized from `fname`.
  */
-float3d_t **read_altitudes(char *fname, size_t *saverows, size_t *savecols)
+float3d_t **get_altitudes(char *fname, size_t *saverows, size_t *savecols)
 {
 	FILE *altitudes;
 	float3d_t **coords;
 	char *line, *token, *saveptr;
-	size_t n, i, nrows, ncols, maxcols;
+	size_t n, i, nrows, ncols, row, col, maxcols;
 	unsigned char uneven;
 
 	altitudes = fopen(fname, "r");
@@ -39,13 +39,16 @@ float3d_t **read_altitudes(char *fname, size_t *saverows, size_t *savecols)
 		token = strtok_r(line, DELIMS, &saveptr);
 		for (ncols = 0; token != NULL; ncols++)
 			token = strtok_r(NULL, DELIMS, &saveptr);
-		if (ncols > maxcols)
+		if (nrows == 1)
+		    maxcols = ncols;
+		else if (ncols != maxcols)
 		{
 			uneven = TRUE;
-			maxcols = ncols;
+			if (ncols > maxcols)
+			    maxcols = ncols;
 		}
 	}
-	coords = allocate_coords(nrows, ncols);
+	coords = allocate_coords(nrows, maxcols);
 	if (!coords)
 	{
 		free(line);
@@ -73,7 +76,7 @@ float3d_t **read_altitudes(char *fname, size_t *saverows, size_t *savecols)
 	free(line);
 	fclose(altitudes);
 	*saverows = nrows;
-	*savecols = ncols;
+	*savecols = maxcols;
 	return (coords);
 }
 
@@ -89,7 +92,7 @@ float3d_t **allocate_coords(size_t nrows, size_t ncols)
 	float3d_t **coords;
 	size_t i;
 
-	coords = malloc(size_of(float3d_t *) * nrows);
+	coords = malloc(sizeof(float3d_t *) * nrows);
 	if (!coords)
 	{
 		perror("Could not malloc space for altitudes' rows");
@@ -97,7 +100,7 @@ float3d_t **allocate_coords(size_t nrows, size_t ncols)
 	}
 	for (i = 0; i < nrows; i++)
 	{
-		coords[i] = calloc(ncols, size_of(float3d_t));
+		coords[i] = calloc(ncols, sizeof(float3d_t));
 		if (!(coords[i]))
 		{
 			perror("Could not malloc space for altitudes' columns");
@@ -105,6 +108,7 @@ float3d_t **allocate_coords(size_t nrows, size_t ncols)
 			return (NULL);
 		}
 	}
+	return coords;
 }
 
 /**
@@ -112,7 +116,7 @@ float3d_t **allocate_coords(size_t nrows, size_t ncols)
  * @coords: pointer to array to free
  * @i: number of rows to free
  */
-void free_coords(float3d_t **coords, size_t i);
+void free_coords(float3d_t **coords, size_t i)
 {
 	if (coords == NULL || *coords == NULL)
 		return;

@@ -25,13 +25,19 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 	coords = get_altitudes(argv[1], &nrows, &ncols);
-	init_xycoords(coords);
+	grid = allocate_grid(nrows, ncols);
+	if (!grid)
+	{
+	    free_coords(coords, nrows);
+	    exit(EXIT_FAILURE);
+	}
+	init_xycoords(coords, nrows, ncols);
 
 	init_win_rend(&win, &rend);
 	reset_and_clear(rend);
 
-	project_to_grid(grid, coords, angle);
-	draw_grid(grid, rend);
+	project_to_grid(grid, coords, nrows, ncols, angle);
+	draw_grid(grid, nrows, ncols, rend);
 
 	while (!quit)
 	{
@@ -43,8 +49,8 @@ int main(int argc, char *argv[])
 		if (tmp != angle)
 		{
 			reset_and_clear(rend);
-			project_to_grid(grid, coords, angle);
-			draw_grid(grid, rend);
+			project_to_grid(grid, coords, nrows, ncols, angle);
+			draw_grid(grid, nrows, ncols, rend);
 		}
 	}
 	exit(EXIT_SUCCESS);

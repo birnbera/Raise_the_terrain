@@ -5,7 +5,7 @@
  * @win: address of pointer to window
  * @rend: address of pointer to renderer
  */
-void init_win_rend(SDL_Window **win, SDL_Rendere **rend)
+void init_win_rend(SDL_Window **win, SDL_Renderer **rend)
 {
 	atexit(SDL_Quit);
 	if (SDL_Init(SDL_INIT_VIDEO))
